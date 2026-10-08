@@ -51,12 +51,12 @@ export default function Navbar() {
           >
             Projects
           </Link>
-          <Link
+          {/* <Link
             href="/blog"
             className="text-gray-700 hover:text-blue-600 transition font-medium"
           >
             Blog
-          </Link>
+          </Link> */}
           <Link
             href="/contact"
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
