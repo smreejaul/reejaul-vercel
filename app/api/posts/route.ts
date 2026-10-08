@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Post from "@/lib/models/Post";
+import mongoose from "mongoose";
+
+export async function GET() {
+  try {
+    await connectDB();
+    const posts = await Post.find().sort({ date: -1 }).lean().exec();
+    return NextResponse.json({
+      success: true,
+      count: posts.length,
+      posts,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to fetch posts", details: (error as Error).message },
+      { status: 500 },
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
+
   const body = await request.json();
   const { title, slug, date, excerpt, content } = body;
 

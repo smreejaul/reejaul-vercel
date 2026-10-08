@@ -1,14 +1,9 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI!;
-
-if (!MONGODB_URI) {
-  throw new Error("Please define MONGODB_URI in .env.local");
-}
-
 interface MongooseCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
+  uri: string | null;
 }
 
 const globalWithMongoose = global as typeof globalThis & {
@@ -18,15 +13,54 @@ const globalWithMongoose = global as typeof globalThis & {
 const cached: MongooseCache = globalWithMongoose.mongoose || {
   conn: null,
   promise: null,
+  uri: null,
 };
 
-globalWithMongoose.mongoose = cached;
+if (!globalWithMongoose.mongoose) {
+  globalWithMongoose.mongoose = cached;
+}
 
 export async function connectDB() {
-  if (cached.conn) return cached.conn;
+  const uri = process.env.MONGODB_URI;
 
-  cached.promise = cached.promise || mongoose.connect(MONGODB_URI);
-  cached.conn = await cached.promise;
+  if (!uri) {
+    throw new Error("Please define MONGODB_URI in .env.local");
+  }
+
+  // Check if URI changed or connection is pointing to a different database
+  const dbMatch = uri.match(/\/([^/?]+)(\?|$)/);
+  const expectedDbName = dbMatch ? dbMatch[1] : undefined;
+  const isWrongDb =
+    expectedDbName &&
+    mongoose.connection.name &&
+    mongoose.connection.name !== expectedDbName;
+
+  if (cached.conn && (cached.uri !== uri || isWrongDb)) {
+    await mongoose.disconnect();
+    cached.conn = null;
+    cached.promise = null;
+  }
+
+  if (cached.conn && mongoose.connection.readyState === 1) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+    };
+    cached.uri = uri;
+    cached.promise = mongoose.connect(uri, opts);
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (error) {
+    cached.promise = null;
+    throw error;
+  }
 
   return cached.conn;
 }
+
+
